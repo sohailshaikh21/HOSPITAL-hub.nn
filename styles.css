@@ -1336,6 +1336,131 @@ body {
   padding: 1.5rem;
 }
 
+.hub-payment-state-modal {
+  max-width: 480px;
+  padding: 2rem;
+  text-align: center;
+}
+
+.hub-payment-state-icon,
+.hub-payment-pending-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 1rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(214, 173, 120, .12);
+  color: var(--gold);
+  font-size: 1.7rem;
+  font-weight: 800;
+}
+
+.hub-payment-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border-subtle);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: hubPaymentSpin 800ms linear infinite;
+}
+
+.hub-payment-state-copy {
+  margin: 0.5rem 0 1.5rem;
+  color: var(--text-secondary);
+}
+
+.hub-payment-progress-list {
+  display: grid;
+  gap: 0.9rem;
+  margin: 1.5rem 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.hub-payment-progress-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.hub-payment-progress-list li.is-active {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.hub-payment-progress-list li.is-complete {
+  color: var(--status-available);
+  font-weight: 600;
+}
+
+.hub-payment-progress-marker {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 50%;
+  font-size: 0.78rem;
+}
+
+.hub-payment-progress-list li.is-active .hub-payment-progress-marker {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.hub-payment-progress-list li.is-complete .hub-payment-progress-marker {
+  border-color: var(--status-available);
+}
+
+.hub-payment-state-note {
+  margin: 1rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.hub-payment-result-summary {
+  display: grid;
+  margin: 1.25rem 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+}
+
+.hub-payment-result-summary div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  font-size: 0.85rem;
+}
+
+.hub-payment-result-summary div + div {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.hub-payment-result-summary span {
+  color: var(--text-secondary);
+}
+
+.hub-payment-result-summary strong {
+  text-align: right;
+}
+
+@keyframes hubPaymentSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-payment-spinner { animation-duration: 2s; }
+}
+
 /* Visual Calendar in Booking Modal */
 .hub-calendar-grid {
   display: grid;

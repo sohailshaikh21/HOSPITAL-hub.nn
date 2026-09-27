@@ -22,6 +22,7 @@ const sandbox = {
   Set,
   Map,
   JSON,
+  URLSearchParams,
   Promise,
   RegExp,
   Error,
@@ -142,16 +143,52 @@ async function runTests() {
   // 9. Load paymentService
   loadScriptInSandbox('./js/services/paymentService.js');
   const paymentService = sandbox.paymentService;
-  const payTest = await paymentService.initiatePayment({ bookingId: 'BKG-TEST', amount: 50000, method: 'upi' });
-  console.log('✅ 12. paymentService escrow transaction simulated:', payTest.status, 'Txn ID:', payTest.transactionId);
+  const paymentUri = paymentService.createUpiPaymentUri({ upiId: 'merchant@bank', amount: 500, payeeName: 'Test Merchant' });
+  if (!paymentUri.success || !paymentUri.uri.startsWith('upi://pay?') || !paymentUri.uri.includes('am=500.00')) {
+    throw new Error('UPI payment URI was not created correctly');
+  }
+  if (paymentService.createUpiPaymentUri({ upiId: 'not-a-vpa', amount: 500 }).success) {
+    throw new Error('Invalid UPI ID was accepted');
+  }
+  let renderedOptions;
+  sandbox.QRCode = function(container, options) { renderedOptions = options; };
+  sandbox.QRCode.CorrectLevel = { M: 0 };
+  const renderedQr = await paymentService.renderQrCode({}, paymentUri.uri);
+  if (!renderedQr.success || renderedOptions.text !== paymentUri.uri || renderedOptions.width !== 220) {
+    throw new Error('UPI QR renderer did not receive the payment URI');
+  }
+  console.log('✅ 12. paymentService validates UPI IDs, builds payment links, and renders the local QR library.');
+
+  let backendCalled = false;
+  sandbox.API_CONFIG = { request: async () => { backendCalled = true; return { success: true }; } };
+  const localBooking = await bookingService.createBooking({
+    resourceId: 'hub-02', resourceTitle: 'Test Resource', providerEmail: 'provider@test.invalid',
+    seekerEmail: 'seeker@test.invalid', startDate: '2026-11-01', endDate: '2026-11-02',
+    dailyRate: 1000, paymentMethod: 'UPI QR', paymentStatus: 'Pending payment verification',
+    status: 'Pending', localOnly: true
+  });
+  if (!localBooking.success || localBooking.booking.status !== 'Pending' || localBooking.booking.paymentStatus !== 'Pending payment verification' || backendCalled) {
+    throw new Error('UPI payment booking was not saved locally as pending');
+  }
+  console.log('✅ 13. UPI payment booking stays local and pending without a backend call.');
 
   // 10. Load resourceService
+  const tableSeed = sandbox.inventoryData.find(item => item.id === 'hub-08');
+  const oldTableImage = 'https://images.unsplash.com/photo-1520854221256-17451cc331bf?auto=format&fit=crop&w=1200&q=80';
+  const cachedInventory = sandbox.inventoryData.map(item => item.id === 'hub-08'
+    ? { ...item, image: oldTableImage, photos: [oldTableImage, ...item.photos.slice(1)] }
+    : item);
+  sandbox.localStorage.setItem('hub_inventory_v3', JSON.stringify(cachedInventory));
   loadScriptInSandbox('./js/services/resourceService.js');
   const resourceService = sandbox.resourceService;
+  const cachedTable = resourceService.getResourceById('hub-08');
+  if (cachedTable.image !== tableSeed.image || cachedTable.photos[0] !== tableSeed.photos[0]) {
+    throw new Error('Cached banquet table image was not refreshed from the seed');
+  }
   const querySpaces = resourceService.queryResources({ category: 'Spaces' });
-  console.log(`✅ 13. resourceService query returned ${querySpaces.length} spaces.`);
+  console.log(`✅ 14. resourceService refreshed the cached banquet-table image and returned ${querySpaces.length} spaces.`);
 
-  console.log('\n🎉 ALL 13 AUTOMATED TEST SUITES PASSED SUCCESSFULLY!');
+  console.log('\n🎉 ALL 14 AUTOMATED TEST SUITES PASSED SUCCESSFULLY!');
 }
 
 runTests().catch(err => {

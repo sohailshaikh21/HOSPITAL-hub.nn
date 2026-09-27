@@ -13,7 +13,7 @@
  * - Authenticated Reviews System (Gated to Completed Bookings)
  * - Provider Business Verification Dossier & 3–4 Photo Validation
  * - Complete Auth System (Sign In, Sign Up, Profile, Password Meter)
- * - Tokenized B2B Escrow Checkout Simulation
+ * - Frontend-Only UPI QR Payment Reporting
  * - Resilient Offline / Mock Fallback + Backend REST API Sync
  */
 
@@ -51,7 +51,11 @@
       this.bookingDays = 1;
       this.bookingLogistics = 'delivery';
       this.bookingPaymentMethod = 'upi';
+      this.bookingUpiId = window.paymentService ? window.paymentService.getUpiId() : '';
+      this.bookingQrReady = false;
       this.bookingProcessing = false;
+      this.bookingProcessingStep = 0;
+      this.bookingPaymentResult = null;
       this.bookingSuccessData = null;
 
       this.verificationModalOpen = false;
@@ -197,6 +201,35 @@
       `;
 
       this.bindEvents();
+      this.renderBookingQr();
+    }
+
+    renderBookingQr() {
+      const canvas = document.getElementById('booking-upi-qr');
+      if (!canvas || !this.bookingModalItem || !window.paymentService) return;
+      this.bookingQrReady = false;
+      const submitButton = document.getElementById('btn-confirm-booking-submit');
+      if (submitButton) submitButton.disabled = true;
+
+      const amount = Math.round((this.bookingModalItem.pricePerDay || 0) * Math.max(1, this.bookingDays || 1) * 0.20);
+      const payment = window.paymentService.createUpiPaymentUri({
+        upiId: this.bookingUpiId,
+        amount,
+        payeeName: this.bookingModalItem.shopName || 'HospitalityHub',
+        note: `Booking advance ${this.bookingModalItem.title || ''}`
+      });
+      if (!payment.success) return;
+
+      window.paymentService.renderQrCode(canvas, payment.uri).then((result) => {
+        if (!canvas.isConnected) return;
+        if (!result.success) {
+          this.showToast(result.error, 'error');
+          return;
+        }
+        this.bookingQrReady = true;
+        const currentSubmitButton = document.getElementById('btn-confirm-booking-submit');
+        if (currentSubmitButton && !this.bookingProcessing) currentSubmitButton.disabled = false;
+      });
     }
 
     // --- Header Component ---
@@ -392,9 +425,6 @@
               <p class="hub-hero-subtext">${this.t('heroSubtext')}</p>
 
               <div class="hub-hero-badges">
-                <div class="hub-hero-badge-item">
-                  <span>✓</span> ${this.t('verifiedPartnersBadge')}
-                </div>
                 <div class="hub-hero-badge-item">
                   <span>⚡</span> ${this.t('instantDispatchBadge')}
                 </div>
@@ -699,8 +729,8 @@
         { num: 2, icon: "📍", title: "Explore MMR Marketplace", desc: "Filter shared resources strictly within Mumbai, Thane, and Navi Mumbai planning clusters." },
         { num: 3, icon: "🔍", title: "Inspect 3–4 Photo Gallery", desc: "Review authentic multi-angle photos, technical specs, FSSAI compliance, and verified licenses." },
         { num: 4, icon: "📅", title: "Live Calendar Availability", desc: "Select required dates on our visual collision-free calendar showing available vs locked slots." },
-        { num: 5, icon: "🔒", title: "Calendar Lock & Token Advance", desc: "Submit rental request. Pay 20% token to instantly lock provider calendar dates and prevent double-booking." },
-        { num: 6, icon: "🛡️", title: "Simulated Escrow Protection", desc: "Funds and refundable security deposits remain safely in escrow until service delivery sign-off." },
+        { num: 5, icon: "📱", title: "UPI QR Advance", desc: "Scan the merchant QR and report your 20% advance. The pending booking is stored only in this browser; it does not lock the provider's shared calendar." },
+        { num: 6, icon: "✓", title: "Manual Payment Confirmation", desc: "The app cannot verify UPI transfers or hold funds. Confirm payment directly with the recipient before proceeding." },
         { num: 7, icon: "🚚", title: "Dispatch & Site Delivery", desc: "Dedicated logistics transport with live temperature logging or depot self-pickup across MMR." },
         { num: 8, icon: "🔄", title: "Release & Automatic Availability", desc: "Upon booking completion or cancellation, calendar dates automatically release back to the marketplace." },
         { num: 9, icon: "⭐", title: "Verified Enterprise Review", desc: "Leave authentic feedback and ratings accessible exclusively to verified completed bookings." }
@@ -823,7 +853,7 @@
                       <th>Provider</th>
                       <th>Dates & Duration</th>
                       <th>Total Value</th>
-                      <th>Escrow Status</th>
+                      <th>Payment Status</th>
                       <th>Booking Status</th>
                       <th>Actions</th>
                     </tr>
@@ -841,7 +871,7 @@
                         <td style="font-weight: 700;">₹${Number(b.totalAmount).toLocaleString()}</td>
                         <td>
                           <span style="font-size: 0.78rem; font-weight: 600; color: var(--primary);">
-                            ${b.paymentStatus || 'Escrow Locked'}
+                            ${b.paymentStatus || 'Payment confirmation pending'}
                           </span>
                         </td>
                         <td>
@@ -1153,7 +1183,7 @@
                 <ul>
                   <li><a>100% KYC & GSTIN Verification</a></li>
                   <li><a>Real-Time Calendar Lock Engine</a></li>
-                  <li><a>Tokenized Escrow Protection</a></li>
+                  <li><a>UPI QR Payment Reporting</a></li>
                   <li><a>2-Step Condition Photo Audits</a></li>
                   <li><a>24/7 MMR Logistics Support</a></li>
                 </ul>
@@ -1165,7 +1195,7 @@
               <div style="display: flex; gap: 1.5rem;">
                 <a>Privacy Policy</a>
                 <a>Commercial Terms & NOC</a>
-                <a>Escrow Dispute Policy</a>
+                <a>Manual Payment Confirmation</a>
               </div>
             </div>
           </div>
@@ -1450,6 +1480,8 @@
     renderBookingModal() {
       if (!this.bookingModalItem) return '';
       const item = this.bookingModalItem;
+      if (this.bookingPaymentResult) return this.renderPaymentResultModal(item);
+      if (this.bookingProcessing) return this.renderPaymentProcessingModal(item);
       const lockedDates = window.bookingService ? window.bookingService.getLockedDatesForResource(item.id) : [];
 
       // Calculate cost breakdown
@@ -1460,6 +1492,14 @@
       const deliveryFee = this.bookingLogistics === 'delivery' ? (item.category === 'Spaces' ? 0 : 850) : 0;
       const tokenAdvance = Math.round(subtotal * 0.20);
       const totalEstimated = subtotal + deposit + deliveryFee;
+      const upiId = this.bookingUpiId || (window.paymentService ? window.paymentService.getUpiId() : '');
+      const hasValidUpiId = window.paymentService && window.paymentService.isValidUpiId(upiId);
+      const paymentUri = hasValidUpiId ? window.paymentService.createUpiPaymentUri({
+        upiId,
+        amount: tokenAdvance,
+        payeeName: item.shopName || 'HospitalityHub',
+        note: `Booking advance ${item.title || ''}`
+      }) : null;
 
       return `
         <div class="hub-modal-overlay" id="modal-booking-overlay">
@@ -1515,7 +1555,7 @@
                 </div>
               </div>
 
-              <!-- Escrow Financial Breakdown -->
+              <!-- Booking cost and advance breakdown -->
               <div style="background: var(--bg-muted); border-radius: var(--radius-lg); padding: 1rem; margin-bottom: 1.5rem;">
                 <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.65rem;">
                   ${this.t('calculateTotal')} (${days} ${this.t('days')})
@@ -1547,20 +1587,22 @@
                 </div>
               </div>
 
-              <!-- Payment Method Selector -->
+              <!-- Direct UPI QR payment; payment is not verified by the app. -->
               <div class="hub-search-field" style="margin-bottom: 1.5rem;">
-                <label class="hub-search-label">💳 Select Escrow Payment Instrument</label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem;">
-                  <button type="button" class="hub-btn-outline ${this.bookingPaymentMethod === 'upi' ? 'active' : ''}" id="btn-pay-upi" style="font-size: 0.78rem;">
-                    📱 UPI Instant
-                  </button>
-                  <button type="button" class="hub-btn-outline ${this.bookingPaymentMethod === 'card' ? 'active' : ''}" id="btn-pay-card" style="font-size: 0.78rem;">
-                    💳 Corporate Card
-                  </button>
-                  <button type="button" class="hub-btn-outline ${this.bookingPaymentMethod === 'netbanking' ? 'active' : ''}" id="btn-pay-netbanking" style="font-size: 0.78rem;">
-                    🏦 Net Banking
-                  </button>
+                <label class="hub-search-label" for="booking-upi-id">Receive payment at UPI ID</label>
+                <div style="display: flex; gap: 0.5rem;">
+                  <input type="text" id="booking-upi-id" class="hub-search-input" style="min-width: 0; flex: 1;" value="${this.escapeHtml(upiId)}" placeholder="business@bank" autocomplete="off" />
+                  <button type="button" class="hub-btn-outline" id="btn-generate-upi-qr">Show QR</button>
                 </div>
+                ${paymentUri && paymentUri.success ? `
+                  <div style="display: flex; flex-direction: column; align-items: center; gap: 0.75rem; margin-top: 1rem;">
+                    <div id="booking-upi-qr" role="img" aria-label="UPI payment QR code" style="width: 220px; height: 220px;"></div>
+                    <a class="hub-btn-outline" href="${this.escapeHtml(paymentUri.uri)}" style="text-decoration: none;">Open UPI app</a>
+                  </div>
+                ` : `
+                  <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.5rem 0 0;">Enter the receiving merchant UPI ID to create a scan-to-pay QR.</p>
+                `}
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.75rem 0 0;">Payment is not verified or shared with the recipient. A pending booking is saved only in this browser.</p>
               </div>
 
               <!-- Submit Button with Loading State -->
@@ -1568,12 +1610,58 @@
                 class="hub-btn-primary"
                 id="btn-confirm-booking-submit"
                 style="width: 100%; padding: 0.85rem; font-size: 1rem;"
-                ${this.bookingProcessing ? 'disabled' : ''}
+                ${this.bookingProcessing || !hasValidUpiId || !this.bookingQrReady ? 'disabled' : ''}
               >
-                ${this.bookingProcessing ? '🔒 Verifying Escrow & Locking Calendar...' : `Pay ₹${tokenAdvance.toLocaleString()} & Lock Calendar Dates`}
+                ${this.bookingProcessing ? 'Saving pending booking...' : `I’ve paid ₹${tokenAdvance.toLocaleString()} — Send for confirmation`}
               </button>
             </div>
           </div>
+        </div>
+      `;
+    }
+
+    renderPaymentProcessingModal(item) {
+      const steps = [
+        'Submitting payment report',
+        'Saving pending booking locally',
+        'Manual confirmation required'
+      ];
+      return `
+        <div class="hub-modal-overlay" id="modal-booking-overlay">
+          <section class="hub-modal hub-payment-state-modal" role="status" aria-live="polite" aria-busy="true">
+            <div class="hub-payment-state-icon"><span class="hub-payment-spinner"></span></div>
+            <h3 class="hub-modal-title">${this.bookingProcessingStep === 0 ? 'Submitting payment report' : 'Saving your booking'}</h3>
+            <p class="hub-payment-state-copy">${this.bookingProcessingStep === 0 ? 'Please keep this window open.' : this.escapeHtml(item.title)}</p>
+            <ol class="hub-payment-progress-list">
+              ${steps.map((step, index) => `
+                <li class="${index < this.bookingProcessingStep ? 'is-complete' : index === this.bookingProcessingStep ? 'is-active' : ''}">
+                  <span class="hub-payment-progress-marker">${index < this.bookingProcessingStep ? '✓' : index + 1}</span>
+                  <span>${step}</span>
+                </li>
+              `).join('')}
+            </ol>
+            <p class="hub-payment-state-note">UPI transfer status is not available here. This screen only submits your payment report.</p>
+          </section>
+        </div>
+      `;
+    }
+
+    renderPaymentResultModal(item) {
+      const booking = this.bookingPaymentResult;
+      return `
+        <div class="hub-modal-overlay" id="modal-booking-overlay">
+          <section class="hub-modal hub-payment-state-modal" role="status" aria-live="polite">
+            <div class="hub-payment-pending-icon" aria-hidden="true">…</div>
+            <h3 class="hub-modal-title">Payment pending</h3>
+            <p class="hub-payment-state-copy">${this.escapeHtml(item.title)}</p>
+            <div class="hub-payment-result-summary">
+              <div><span>Advance amount</span><strong>₹${Number(booking.tokenPaid || 0).toLocaleString()}</strong></div>
+              <div><span>Booking reference</span><strong>#${this.escapeHtml(booking.id)}</strong></div>
+              <div><span>Payment status</span><strong>Pending · not verified</strong></div>
+            </div>
+            <p class="hub-payment-state-note">Payment has not been verified or confirmed by the app. The booking remains pending and is saved only in this browser; the recipient was not notified.</p>
+            <button type="button" class="hub-btn-primary" id="btn-finish-payment" style="width: 100%; margin-top: 1rem;">Continue to bookings</button>
+          </section>
         </div>
       `;
     }
@@ -2215,6 +2303,16 @@
         });
       }
 
+      const finishPayment = document.getElementById('btn-finish-payment');
+      if (finishPayment) {
+        finishPayment.addEventListener('click', () => {
+          this.bookingPaymentResult = null;
+          this.bookingModalItem = null;
+          this.detailModalItem = null;
+          this.switchView('seeker-dashboard');
+        });
+      }
+
       const bkgStart = document.getElementById('booking-start-date');
       if (bkgStart) {
         bkgStart.addEventListener('change', (e) => {
@@ -2249,13 +2347,19 @@
         });
       }
 
-      // Payment Instruments
-      const payUpi = document.getElementById('btn-pay-upi');
-      if (payUpi) payUpi.addEventListener('click', () => { this.bookingPaymentMethod = 'upi'; this.render(); });
-      const payCard = document.getElementById('btn-pay-card');
-      if (payCard) payCard.addEventListener('click', () => { this.bookingPaymentMethod = 'card'; this.render(); });
-      const payNet = document.getElementById('btn-pay-netbanking');
-      if (payNet) payNet.addEventListener('click', () => { this.bookingPaymentMethod = 'netbanking'; this.render(); });
+      const generateUpiQr = document.getElementById('btn-generate-upi-qr');
+      if (generateUpiQr) {
+        generateUpiQr.addEventListener('click', () => {
+          const upiInput = document.getElementById('booking-upi-id');
+          const savedUpi = window.paymentService.saveUpiId(upiInput ? upiInput.value : '');
+          if (!savedUpi.success) {
+            this.showToast(savedUpi.error, 'error');
+            return;
+          }
+          this.bookingUpiId = savedUpi.upiId;
+          this.render();
+        });
+      }
 
       // Confirm Booking Submit Handler
       const confirmBooking = document.getElementById('btn-confirm-booking-submit');
@@ -2275,45 +2379,52 @@
             return;
           }
 
+          if (!window.paymentService.isValidUpiId(this.bookingUpiId)) {
+            this.showToast('Enter a valid merchant UPI ID and generate the payment QR first.', 'error');
+            return;
+          }
+
           this.bookingProcessing = true;
+          this.bookingProcessingStep = 0;
           this.render();
 
-          // 1. Escrow Token Handshake
-          const payRes = await window.paymentService.initiatePayment({
-            bookingId: 'BKG-PRE',
-            amount: this.bookingModalItem.pricePerDay * this.bookingDays,
-            method: this.bookingPaymentMethod,
-            payerEmail: user.email,
-            payerBusiness: user.businessName
-          });
+          let bookingRes;
+          try {
+            await new Promise(resolve => setTimeout(resolve, 650));
+            this.bookingProcessingStep = 1;
+            this.render();
+            await new Promise(resolve => setTimeout(resolve, 650));
+            bookingRes = await window.bookingService.createBooking({
+              resourceId: this.bookingModalItem.id,
+              resourceTitle: this.bookingModalItem.title,
+              category: this.bookingModalItem.category,
+              providerEmail: this.bookingModalItem.ownerEmail || '',
+              providerBusiness: this.bookingModalItem.shopName,
+              seekerEmail: user.email,
+              seekerBusiness: user.businessName,
+              seekerPhone: user.phone,
+              startDate: this.bookingStartDate,
+              endDate: this.bookingEndDate,
+              dailyRate: this.bookingModalItem.pricePerDay,
+              securityDeposit: this.bookingModalItem.securityDeposit,
+              logisticsFee: this.bookingLogistics === 'delivery' ? (this.bookingModalItem.category === 'Spaces' ? 0 : 850) : 0,
+              paymentMethod: 'UPI QR (manual confirmation)',
+              paymentStatus: 'Pending payment verification',
+              status: 'Pending',
+              localOnly: true,
+              notes: 'Payment was self-reported after scanning a UPI QR. It has not been verified by the app.'
+            });
+          } catch (error) {
+            bookingRes = { success: false, error: error.message || 'Could not save the pending booking.' };
+          } finally {
+            this.bookingProcessing = false;
+          }
 
-          // 2. Create Booking & Lock Calendar
-          const res = await window.bookingService.createBooking({
-            resourceId: this.bookingModalItem.id,
-            resourceTitle: this.bookingModalItem.title,
-            category: this.bookingModalItem.category,
-            providerEmail: this.bookingModalItem.ownerEmail || 'procurement@imperialbanquets.in',
-            providerBusiness: this.bookingModalItem.shopName,
-            seekerEmail: user.email,
-            seekerBusiness: user.businessName,
-            seekerPhone: user.phone,
-            startDate: this.bookingStartDate,
-            endDate: this.bookingEndDate,
-            dailyRate: this.bookingModalItem.pricePerDay,
-            securityDeposit: this.bookingModalItem.securityDeposit,
-            logisticsFee: this.bookingLogistics === 'delivery' ? 850 : 0,
-            paymentMethod: this.bookingPaymentMethod
-          });
-
-          this.bookingProcessing = false;
-
-          if (res.success) {
-            this.bookingModalItem = null;
-            this.detailModalItem = null;
-            this.showToast(res.message, 'success');
-            this.switchView('seeker-dashboard');
+          if (bookingRes.success) {
+            this.bookingPaymentResult = bookingRes.booking;
+            this.render();
           } else {
-            this.showToast(res.error, 'error');
+            this.showToast(bookingRes.error, 'error');
             this.render();
           }
         });

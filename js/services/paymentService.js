@@ -1,93 +1,69 @@
-/**
- * HospitalityHub B2B Resource Exchange
- * Payment & Escrow Service (Backend-Ready Security Architecture)
- * 
- * Manages tokenized advance payments, refundable security deposits,
- * escrow lifecycle states, and payment gateway simulation.
- * Strict Security: Zero raw card storage, client-side secret-free.
- */
-
+/** Frontend-only UPI QR payment helper. Payments are not verified by this app. */
 (function(window) {
   'use strict';
 
-  const PAYMENT_STATES = {
-    PENDING: 'Payment Pending',
-    PROCESSING: 'Processing Escrow Lock',
-    SUCCESS: 'Payment Successful',
-    FAILED: 'Payment Failed',
-    CANCELLED: 'Payment Cancelled',
-    REFUNDED: 'Deposit Refunded'
-  };
+  const UPI_ID_STORAGE_KEY = 'hospitalityhub_merchant_upi_id';
+
+  function isValidUpiId(upiId) {
+    return /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z0-9.-]{2,64}$/.test(String(upiId || '').trim());
+  }
 
   class PaymentService {
-    constructor() {
-      this.states = PAYMENT_STATES;
+    getUpiId() {
+      return window.localStorage.getItem(UPI_ID_STORAGE_KEY) || '';
     }
 
-    // Initiate Escrow Payment Transaction
-    async initiatePayment(paymentData) {
-      const { bookingId, amount, tokenAmount, depositAmount, method, payerEmail, payerBusiness } = paymentData;
+    isValidUpiId(upiId) {
+      return isValidUpiId(upiId);
+    }
 
-      if (!amount || amount <= 0) {
-        return { success: false, error: 'Invalid payment amount specified.' };
+    saveUpiId(upiId) {
+      const normalizedUpiId = String(upiId || '').trim();
+      if (!isValidUpiId(normalizedUpiId)) {
+        return { success: false, error: 'Enter a valid merchant UPI ID, for example business@bank.' };
+      }
+      window.localStorage.setItem(UPI_ID_STORAGE_KEY, normalizedUpiId);
+      return { success: true, upiId: normalizedUpiId };
+    }
+
+    createUpiPaymentUri({ upiId, amount, payeeName = 'HospitalityHub', note = 'Booking advance' }) {
+      const normalizedUpiId = String(upiId || '').trim();
+      const paymentAmount = Number(amount);
+      if (!isValidUpiId(normalizedUpiId)) {
+        return { success: false, error: 'Enter a valid merchant UPI ID to generate the payment QR.' };
+      }
+      if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+        return { success: false, error: 'The payment amount must be greater than zero.' };
       }
 
-      // Generate a simulated transaction reference
-      const transactionId = `TXN-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-
-      // Simulate tokenized gateway handshake
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({
-            success: true,
-            transactionId,
-            status: PAYMENT_STATES.SUCCESS,
-            tokenAmount: tokenAmount || Math.round(amount * 0.20),
-            depositAmount: depositAmount || 0,
-            escrowAccount: "HOSPITALITYHUB-ESCROW-ICICI-0042",
-            method: method || 'UPI Corporate Instant',
-            timestamp: new Date().toISOString(),
-            message: 'Advance token and escrow deposit locked securely. Calendar reservation finalized.'
-          });
-        }, 1200);
+      const params = new URLSearchParams({
+        pa: normalizedUpiId,
+        pn: payeeName,
+        am: paymentAmount.toFixed(2),
+        cu: 'INR',
+        tn: note
       });
+      return { success: true, uri: `upi://pay?${params.toString()}` };
     }
 
-    // Backend-Ready Verification Hook
-    async verifyPaymentStatus(transactionId) {
-      if (!transactionId) {
-        return { status: PAYMENT_STATES.FAILED, error: 'Transaction ID required.' };
+    async renderQrCode(canvas, paymentUri) {
+      try {
+        if (typeof window.QRCode !== 'function') {
+          return { success: false, error: 'The local QR generator is unavailable. Reload the app and try again.' };
+        }
+        new window.QRCode(canvas, {
+          text: paymentUri,
+          width: 220,
+          height: 220,
+          correctLevel: window.QRCode.CorrectLevel.M
+        });
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error.message || 'Could not render the UPI payment QR.' };
       }
-
-      // Server verification placeholder
-      return {
-        status: PAYMENT_STATES.SUCCESS,
-        verifiedByServer: true,
-        transactionId,
-        timestamp: new Date().toISOString()
-      };
-    }
-
-    // Initiate Escrow Deposit Refund on Completion
-    async refundEscrowDeposit(bookingId, depositAmount, reason = 'Post-rental condition audit passed') {
-      return {
-        success: true,
-        bookingId,
-        refundedAmount: depositAmount,
-        status: PAYMENT_STATES.REFUNDED,
-        reason,
-        timestamp: new Date().toISOString(),
-        message: `Refund of ₹${depositAmount.toLocaleString()} has been dispatched to the seeker's corporate account.`
-      };
     }
   }
 
-  if (typeof window !== 'undefined') {
-    window.paymentService = new PaymentService();
-    window.PAYMENT_STATES = PAYMENT_STATES;
-  }
-
-  if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PaymentService;
-  }
+  if (typeof window !== 'undefined') window.paymentService = new PaymentService();
+  if (typeof module !== 'undefined' && module.exports) module.exports = PaymentService;
 })(typeof window !== 'undefined' ? window : global);

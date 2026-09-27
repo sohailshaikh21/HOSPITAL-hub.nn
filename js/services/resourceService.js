@@ -21,7 +21,16 @@
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const cachedTable = parsed.find(item => item.id === 'hub-08');
+            const seedTable = (window.inventoryData || []).find(item => item.id === 'hub-08');
+            const oldTablePhoto = 'https://images.unsplash.com/photo-1520854221256-17451cc331bf?auto=format&fit=crop&w=1200&q=80';
+            if (cachedTable && seedTable && (cachedTable.image === oldTablePhoto || cachedTable.photos?.[0] === oldTablePhoto)) {
+              cachedTable.image = seedTable.image;
+              cachedTable.photos = [...seedTable.photos];
+            }
+            return parsed;
+          }
         }
       } catch (e) {}
       return window.inventoryData || [];

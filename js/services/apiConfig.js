@@ -9,9 +9,27 @@
 (function(window) {
   'use strict';
 
+  // A static preview server (for example VS Code Live Server on :5500) cannot
+  // handle the Express API routes. Route local previews to the API server while
+  // retaining same-origin `/api` requests when the app is served by Express or
+  // a deployed host.
+  function resolveApiBaseUrl() {
+    if (window.APP_CONFIG && window.APP_CONFIG.API_BASE_URL) {
+      return window.APP_CONFIG.API_BASE_URL.replace(/\/$/, '');
+    }
+
+    const { protocol, hostname, port } = window.location || {};
+    const isLocalPreview =
+      (hostname === 'localhost' || hostname === '127.0.0.1') &&
+      port &&
+      port !== '3001';
+
+    return isLocalPreview ? `${protocol}//${hostname}:3001/api` : '/api';
+  }
+
   const API_CONFIG = {
     // Backend API Base URL (can be customized via window.APP_CONFIG or environment)
-    BASE_URL: (window.APP_CONFIG && window.APP_CONFIG.API_BASE_URL) || '/api',
+    BASE_URL: resolveApiBaseUrl(),
     TIMEOUT_MS: 8000,
     USE_MOCK_FALLBACK: true,
     IS_BACKEND_CONNECTED: false,

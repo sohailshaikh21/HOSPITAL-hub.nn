@@ -17,6 +17,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 
+import supabase from './supabaseClient.js';
 import {
   supabaseAdmin,
   isConfigured,
@@ -68,6 +69,28 @@ app.get('/api/health', (req, res) => {
     supabaseConnected: isConfigured,
     timestamp: new Date().toISOString()
   });
+});
+
+app.get('/api/test', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('resources')
+      .select('id, title, category, price_per_day')
+      .limit(5);
+
+    if (error) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+
+    res.json({
+      success: true,
+      message: 'Supabase se data fetch ho gaya!',
+      count: data.length,
+      data: data
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ==========================================
@@ -278,7 +301,7 @@ app.put('/api/auth/profile', requireSupabase, async (req, res) => {
 });
 
 // ==========================================
-// 3. COMMERCIAL RESOURCES APIS
+// 4. COMMERCIAL RESOURCES APIS
 // ==========================================
 
 // Get All Public Resources

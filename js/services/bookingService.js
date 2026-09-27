@@ -87,6 +87,13 @@
       } catch (e) {}
     }
 
+    // Store a booking in this browser without syncing it to the backend.
+    recordBookingLocally(booking) {
+      if (!booking || !booking.id) return;
+      this.bookings = [booking, ...this.bookings.filter(item => item.id !== booking.id)];
+      this.saveBookings();
+    }
+
     // Generate array of ISO date strings ('YYYY-MM-DD') between startDate and endDate inclusive
     getDateRangeArray(startDateStr, endDateStr) {
       const dates = [];
@@ -189,7 +196,10 @@
         securityDeposit,
         logisticsFee,
         paymentMethod,
-        notes
+        notes,
+        paymentStatus,
+        status,
+        localOnly = false
       } = bookingPayload;
 
       // 1. Validate mandatory fields
@@ -238,14 +248,14 @@
         tokenPaid,
         totalAmount,
         paymentMethod: paymentMethod || 'UPI Instant Escrow',
-        paymentStatus: 'Payment Successful (Escrow Locked)',
-        status: 'Confirmed', // Resource locked immediately
-        notes: notes || 'Standard B2B commercial rental with 20% token escrow protection.',
+        paymentStatus: paymentStatus || 'Payment Successful (Escrow Locked)',
+        status: status || 'Confirmed',
+        notes: notes || 'Standard B2B commercial rental with 20% booking advance.',
         createdAt: new Date().toISOString()
       };
 
       // Try Backend REST API
-      if (window.API_CONFIG) {
+      if (!localOnly && window.API_CONFIG) {
         await window.API_CONFIG.request('/requests', {
           method: 'POST',
           body: JSON.stringify({
@@ -269,8 +279,7 @@
         });
       }
 
-      this.bookings.unshift(newBooking);
-      this.saveBookings();
+      this.recordBookingLocally(newBooking);
 
       // Trigger resource service update
       if (window.resourceService) {
@@ -280,7 +289,9 @@
       return {
         success: true,
         booking: newBooking,
-        message: `Booking #${newBooking.id} confirmed. Calendar dates (${startDate} to ${endDate}) have been locked.`
+        message: newBooking.status === 'Pending'
+          ? `Booking #${newBooking.id} is pending manual payment confirmation.`
+          : `Booking #${newBooking.id} confirmed. Calendar dates (${startDate} to ${endDate}) have been locked.`
       };
     }
 

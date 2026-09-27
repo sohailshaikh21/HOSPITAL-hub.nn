@@ -38,7 +38,7 @@ const TRANSLATIONS = {
     // Hero Section
     heroEyebrow: "Mumbai Metropolitan Region (MMR) B2B Hospitality Exchange",
     heroHeading: "Share, Negotiate & Rent Verified Hospitality Assets Across MMR",
-    heroSubtext: "Discover verified banquet spaces, industrial kitchen appliances, refrigerated logistics, and power utilities with real-time calendar lock and escrow protection.",
+    heroSubtext: "Discover verified banquet spaces, industrial kitchen appliances, refrigerated logistics, and power utilities with UPI QR payment reporting and browser-local pending bookings.",
     exploreResources: "Explore MMR Marketplace",
     listYourResource: "List Your Resource",
     verifiedPartnersBadge: "100% KYC & GSTIN Verified",
@@ -209,7 +209,7 @@ const TRANSLATIONS = {
     // Hero Section
     heroEyebrow: "मुंबई महानगर क्षेत्र (MMR) बी2बी हॉस्पिटैलिटी एक्सचेंज",
     heroHeading: "एमएमआर में सत्यापित हॉस्पिटैलिटी संपत्तियों को साझा करें और बुक करें",
-    heroSubtext: "बैंक्वेट हॉल, वाणिज्यिक रसोई उपकरण, प्रशीतित परिवहन और जनरेटर को वास्तविक समय के कैलेंडर लॉक और एस्क्रो सुरक्षा के साथ किराए पर लें।",
+    heroSubtext: "बैंक्वेट हॉल, वाणिज्यिक रसोई उपकरण, प्रशीतित परिवहन और जनरेटर खोजें। UPI QR भुगतान रिपोर्ट करें; बुकिंग इसी ब्राउज़र में लंबित रहेगी।",
     exploreResources: "एमएमआर मार्केटप्लेस देखें",
     listYourResource: "अपना संसाधन सूचीबद्ध करें",
     verifiedPartnersBadge: "100% जीएसटी एवं केवाईसी सत्यापित",
@@ -681,11 +681,11 @@ let inventoryData = [
       "Collapsible Trolley Racks for Rapid Unloading"
     ],
     photos: [
-      "https://images.unsplash.com/photo-1520854221256-17451cc331bf?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1200&q=80"
+      "https://images.unsplash.com/photo-1768851142332-75f3d1b47452?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1524824267900-2fa9cbf7a506?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1581524632480-42b044581d0e?auto=format&fit=crop&w=1200&q=80"
     ],
-    image: "https://images.unsplash.com/photo-1520854221256-17451cc331bf?auto=format&fit=crop&w=1200&q=80",
+    image: "https://images.unsplash.com/photo-1768851142332-75f3d1b47452?auto=format&fit=crop&w=1200&q=80",
     coordinates: { lat: 19.0178, lng: 72.8478 },
     instantDispatchAvailable: false,
     bookedDates: [],
